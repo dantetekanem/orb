@@ -1,0 +1,6 @@
+.build/
+.runtime/
+dist/
+node_modules/
+goal.md
+.DS_Store

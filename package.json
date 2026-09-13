@@ -1,0 +1,15 @@
+{
+  "name": "orb",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A native macOS voice and question island for local agents.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dantetekanem/orb.git"
+  },
+  "homepage": "https://github.com/dantetekanem/orb#readme",
+  "bugs": {
+    "url": "https://github.com/dantetekanem/orb/issues"
+  }
+}
