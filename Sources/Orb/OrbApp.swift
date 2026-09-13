@@ -162,9 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.replay(id)
     }
 
-    @objc private func demonstrate() {
-        model.speak(Message(text: "Your work is ready. Take a look when you have a moment.", source: "Orb"))
-    }
+    @objc private func demonstrate() { model.demonstrate() }
     @objc private func stopSpeaking() { model.stop() }
     @objc private func toggleMeetingMode() { model.meetingMode.toggle() }
     @objc private func showSettings() {

@@ -13,13 +13,18 @@ struct IslandView: View {
     let explanations: ExplanationBubbleController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var motionClock = OrbMotionClock()
+    private var motionPaused: Bool {
+        OrbMotionClock.isPaused(phase: model.playback.phase, silent: model.silentPresentation, reduceMotion: reduceMotion)
+    }
     private var closing: Bool { model.playback.phase == .settling || model.playback.phase == .idle }
     private var visibleQuestion: PendingQuestion? { model.playback.phase == .choosing ? model.pendingQuestion : nil }
 
     var body: some View {
         VStack(spacing: 0) {
             IslandSurface(model: model, progress: closing ? 1 : 0, closing: closing,
-                          reduceMotion: reduceMotion, reduceTransparency: reduceTransparency)
+                          reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
+                          motionClock: motionClock, motionPaused: motionPaused)
                 .animation(reduceMotion ? .linear(duration: 0.15) : (closing
                     ? .linear(duration: ClosingMotion.duration)
                     : .spring(response: 0.44, dampingFraction: 0.86)), value: closing)
@@ -41,6 +46,13 @@ struct IslandView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(name: "orb-island")
         .preferredColorScheme(.dark)
+        .onChange(of: model.playback.id, initial: true) { _, _ in updateMotionClock() }
+        .onChange(of: motionPaused) { _, _ in updateMotionClock() }
+    }
+
+    private func updateMotionClock() {
+        motionClock.update(presentationID: model.playback.id, paused: motionPaused,
+                           at: ProcessInfo.processInfo.systemUptime)
     }
 }
 
@@ -50,6 +62,8 @@ private struct IslandSurface: View, Animatable {
     let closing: Bool
     let reduceMotion: Bool
     let reduceTransparency: Bool
+    let motionClock: OrbMotionClock
+    let motionPaused: Bool
     var animatableData: Double {
         get { progress }
         set { progress = newValue }
@@ -72,8 +86,11 @@ private struct IslandSurface: View, Animatable {
             bottomTrailingRadius: mix(38, 18, contraction),
             topTrailingRadius: model.hasNotch ? 9 : mix(30, 15, contraction))
 
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion || closing || model.silentPresentation || model.playback.phase == .choosing)) { timeline in
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: motionPaused)) { _ in
             let level = model.voiceLevel
+            let elapsed = motionClock.elapsed(at: ProcessInfo.processInfo.systemUptime)
+            let orbFrame = OrbMotionFrame(elapsed: model.playback.phase == .failed ? OrbMotionFrame.entranceDuration : elapsed,
+                                          level: level, reduceMotion: reduceMotion)
             let lift = reduceMotion ? 0 : level.energy
             let stretch = CGSize(width: 1 + lift * 0.004, height: 1 + lift * 0.012)
             let spring: Animation? = reduceMotion ? nil : .interpolatingSpring(stiffness: 400, damping: 24)
@@ -94,9 +111,8 @@ private struct IslandSurface: View, Animatable {
                     .frame(width: max(0, width - 64)).opacity(1 - fade)
                     .position(x: width / 2, y: mix(model.notchHeight + (model.presentationIsQuestion ? 22 : 44), closedHeight / 2, contraction))
                 } else {
-                    VoiceOrb(time: reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate,
-                             level: reduceMotion ? VoiceLevel(energy: 0.2, bass: 0.1, air: 0.1) : level)
-                        .frame(width: 412, height: 148)
+                    VoiceOrb(frame: orbFrame)
+                        .frame(width: 412, height: 164)
                         .scaleEffect(mix(1, 0.14, contraction)).opacity(1 - fade)
                         .position(x: width / 2, y: mix(model.notchHeight + 88, closedHeight / 2, contraction))
                     if let title = model.presentationMessage?.title {

@@ -145,6 +145,12 @@ final class OrbModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         return generate(message, id: id)
     }
 
+    func demonstrate() {
+        stop(reason: "replaced")
+        let message = Message(text: "Your work is ready. Take a look when you have a moment.", source: "Orb")
+        _ = generate(message, id: playback.begin(message))
+    }
+
     func replay(_ entryID: UUID) {
         guard let entry = recentMessages.first(where: { $0.id == entryID }) else { return }
         stop(reason: "replaced")

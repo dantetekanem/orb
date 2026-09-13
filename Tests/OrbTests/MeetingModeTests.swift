@@ -55,6 +55,40 @@ final class MeetingModeTests: XCTestCase {
         }
     }
 
+    func testTryOrbNeverAddsOrEvictsRecentMessagesDuringVoiceOrSilentDelivery() {
+        for activity in [InputActivity.inactive, .active, .unknown] {
+            let fixture = Fixture(activity)
+            defer { fixture.model.shutdown() }
+            fixture.model.demonstrate()
+            XCTAssertTrue(fixture.model.recentMessages.isEmpty)
+            for index in 1...10 { fixture.model.speak(Message(text: "Incoming \(index)")) }
+            let history = fixture.model.recentMessages.map(\.id)
+            XCTAssertEqual(history.count, 10)
+            fixture.model.demonstrate()
+            fixture.model.demonstrate()
+            XCTAssertEqual(fixture.model.recentMessages.map(\.id), history)
+            XCTAssertEqual(fixture.model.playback.phase, activity == .inactive ? .preparing : .notifying)
+            XCTAssertEqual(fixture.jobsCreated, activity == .inactive ? 13 : 0)
+        }
+    }
+
+    func testTryOrbReplacesAQuestionWithoutRecordingTheDemoAndRespectsMeetingMode() throws {
+        let fixture = Fixture(.inactive)
+        defer { fixture.model.shutdown() }
+        fixture.model.meetingMode = true
+        let question = try Question.decode(Data(#"{"question":"Continue?","answers":[{"id":"yes","label":"Yes"},{"id":"no","label":"No"}],"default_answer_id":"no"}"#.utf8))
+        var replies: [Reply] = []
+        _ = fixture.model.handle(.ask(question)) { replies.append($0) }
+        let history = fixture.model.recentMessages.map(\.id)
+        fixture.model.demonstrate()
+        XCTAssertEqual(replies.count, 1)
+        XCTAssertEqual(replies.first?.body["reason"], "replaced")
+        XCTAssertNil(fixture.model.pendingQuestion)
+        XCTAssertEqual(fixture.model.recentMessages.map(\.id), history)
+        XCTAssertEqual(fixture.model.playback.phase, .notifying)
+        XCTAssertEqual(fixture.jobsCreated, 0)
+    }
+
     func testRecentMessagesKeepOnlyNewestTenAndIgnoreEvictedReplay() throws {
         let fixture = Fixture(.active)
         defer { fixture.model.shutdown() }
